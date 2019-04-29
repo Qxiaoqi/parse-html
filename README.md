@@ -13,5 +13,7 @@
 ### 参考资料
 
 [HTML官方文档状态机](https://html.spec.whatwg.org/multipage/parsing.html#tokenization)
+
 [来自github](https://github.com/aimergenge/toy-html-parser)
+
 [重学前端](https://time.geekbang.org/column/article/80260)
