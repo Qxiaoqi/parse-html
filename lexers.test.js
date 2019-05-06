@@ -1,15 +1,15 @@
 const { HTMLLexicalParse } = require("./lexers");
 
-// const testHTML = `<html maaa=a >
-// <head>
-//   <title>cool</title>
-// </head>
-// <body>
-//   <img src="a" />
-// </body>
-// </html>`
+const testHTML = `<html maaa=a >
+<head>
+  <title>cool</title>
+</head>
+<body>
+  <img src="a" />
+</body>
+</html>`
 
-const testHTML = `<1html>`
+// const testHTML = `<img src="a" test1='b' test2=c>`
 
 let lexer = new HTMLLexicalParse();
 

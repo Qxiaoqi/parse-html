@@ -17,10 +17,18 @@
 */
 
 const data = Symbol("data");
+const characterReference = Symbol("characterReference");
 const tagOpen = Symbol("tagOpen");
 const tagName = Symbol("tagName");
 const endTagOpen = Symbol("endTagOpen");
-const characterReference = Symbol("characterReference");
+const beforeAttributeName = Symbol("beforeAttributeName");
+const attributeName = Symbol("attributeName");
+const beforeAttributeValue = Symbol("beforeAttributeValue");
+const attributeValueDoubleQuoted = Symbol("attributeValueDoubleQuoted");
+const attributeValueSingleQuoted = Symbol("attributeValueSingleQuoted");
+const attributeValueUnquoted = Symbol("attributeValueUnquoted");
+const afterAttributeValueQuoted = Symbol("afterAttributeValueQuoted");
+const selfClosingStartTag = Symbol("selfClosingStartTag");
 
 // 输出
 const emitToken = Symbol("emitToken");
@@ -60,8 +68,8 @@ class HTMLLexicalParse {
         return this[tagOpen];
 
       // 什么情况才触发这种情况？
-      case EOF:
-        console.log("EOF");
+      // case EOF:
+        // console.log("EOF");
 
       // 空格 换行 等
       default:
@@ -76,9 +84,11 @@ class HTMLLexicalParse {
       // return this[markupDeclarationOpen];
     }
 
-    // 标签结束
+    // 结束标签
     if (c === "/") {
-      // return this[endTagOpen];
+      this._token = new EndTagToken();
+      this._token.name = "";
+      return this[endTagOpen];
     }
 
     // 开始标签
@@ -92,13 +102,23 @@ class HTMLLexicalParse {
     return this[error](c);
   }
 
+  [endTagOpen](c) {
+    if (c === ">") {
+      this[emitToken](this._token);
+      return this[data];
+    }
+
+    this._token.name += c;
+    return this[endTagOpen];
+  }
+
   [tagName](c) {
     // tab \t
     // LF 换行 \n
     // FF 换页 \f
     // SPACE 
     if (/[\t\n\f ]/.test(c)) {
-      // return this[beforeAttributeName];
+      return this[beforeAttributeName];
     }
 
     if (c === "/") {
@@ -120,7 +140,146 @@ class HTMLLexicalParse {
     // 目前是如果没有匹配到，也就没有返回状态，
     // 因此读下一个字符的时候会触发this._state === null内的代码
 
-    // 但是这样对错误的处理并不合适，有待学习
+    // 但是这样对错误的处理并不合适，有待研究
+  }
+
+  [beforeAttributeName](c) {
+    // tab \t
+    // LF 换行 \n
+    // FF 换页 \f
+    // SPACE 
+    if (/[\t\n\f ]/.test(c)) {
+      return this[beforeAttributeName];
+    }
+
+    if (c === "/") {
+      return this[selfClosingStartTag];
+    }
+
+    if (c === ">") {
+      this[emitToken](this._token);
+      return this[data];
+    }
+
+    if (c === "=") {
+      // This is an unexpected-equals-sign-before-attribute-name parse error. Start a new attribute in the current tag token. Set that attribute's name to the current input character, and its value to the empty string. Switch to the attribute name state.
+    }
+
+    this._attribute = new Attribute();
+    this._attribute.name = c;
+    this._attribute.value = "";
+    return this[attributeName];
+  }
+
+  [attributeName](c) {
+    if (/[\t\n\f \/>]/.test(c)) {
+      // return this[afterAttributeName];
+    }
+
+    if (c === "=") {
+      return this[beforeAttributeValue];
+    }
+
+    if (/["'<]/.test(c)) {
+      // This is an unexpected-character-in-attribute-name parse error. Treat it as per the "anything else" entry below.
+    }
+
+    this._attribute.name += c;
+    return this[attributeName];
+  }
+
+  [beforeAttributeValue](c) {
+    // 忽略
+    if (/[\t\n\f ]/.test(c)) {
+      return this[beforeAttributeValue];
+    }
+
+    if (/["]/.test(c)) {
+      return this[attributeValueDoubleQuoted];
+    }
+
+    if (/[']/.test(c)) {
+      return this[attributeValueSingleQuoted];
+    }
+
+    if (c === ">") {
+      // This is a missing-attribute-value parse error. Switch to the data state. Emit the current tag token.
+    }
+
+    // 无双引号或单引号
+    this._attribute.value += c;
+    this._token[this._attribute.name] = this._attribute.value;
+    return this[attributeValueUnquoted];
+  }
+
+  [attributeValueDoubleQuoted](c) {
+    if (/["]/.test(c)) {
+      this._token[this._attribute.name] = this._attribute.value;
+      return this[afterAttributeValueQuoted];
+    }
+
+    if (c === "&") {
+
+    }
+
+    this._attribute.value += c;
+    return this[attributeValueDoubleQuoted]; 
+  }
+
+  [attributeValueSingleQuoted](c) {
+    if (/[']/.test(c)) {
+      this._token[this._attribute.name] = this._attribute.value;
+      return this[afterAttributeValueQuoted];
+    }
+
+    if (c === "&") {
+
+    }
+
+    this._attribute.value += c;
+    return this[attributeValueSingleQuoted]; 
+  }
+
+  [attributeValueUnquoted](c) {
+    if (/[\t\n\f ]/.test(c)) {
+      return this[beforeAttributeName];
+    }
+
+    if (c === "&") {
+      // 
+    }
+
+    if (c === ">") {
+      this[emitToken](this._token);
+      return this[data];
+    }
+
+    this._attribute.value += c;
+    return this[attributeValueUnquoted];
+  }
+
+  [afterAttributeValueQuoted](c) {
+    if (/[\t\n\f ]/.test(c)) {
+      return this[beforeAttributeName];
+    }
+
+    if (c === "/") {
+      return this[selfClosingStartTag];
+    }
+
+    if (c === ">") {
+      this[emitToken](this._token);
+      return this[data];
+    }
+  }
+
+  [selfClosingStartTag](c) {
+    if (c === ">") {
+      this[emitToken](this._token);
+      return this[data];
+    }
+
+
   }
 
   [characterReference](c) {
@@ -128,7 +287,11 @@ class HTMLLexicalParse {
   }
 
   [emitToken](token) {
-    console.log(token);
+    if (typeof token === 'string') {
+      console.log(`String(${token.replace(/ /, '<whitespace>').replace(/\n/, '\\n')})`)
+    } else {
+      console.log(token);
+    }
   }
 
   [error](c) {
@@ -144,6 +307,9 @@ class StartTagToken {}
 
 // 闭合标签
 class EndTagToken {}
+
+// 属性
+class Attribute {}
 
 module.exports = {
   HTMLLexicalParse
