@@ -46,6 +46,8 @@ class HTMLLexicalParse {
     this._token = null;
     // 记录分析出来的属性
     this._attribute = null;
+    // 记录&的字符串
+    this._character = null;
   }
 
   // 读取传入的字符
@@ -62,7 +64,8 @@ class HTMLLexicalParse {
     switch (c) {
       // &lt;
       case "&":
-        // return this[characterReference]; 
+        this._character = "";
+        return this[characterReference]; 
 
       case "<":
         return this[tagOpen];
@@ -98,7 +101,12 @@ class HTMLLexicalParse {
       return this[tagName];
     }
 
-    // 解析错误，当然未必错误，这里有些情况没有写
+    // invalid-first-character-of-tag-name
+    // Whereas, if an end tag was expected, such code point and all content that follows up to a U+003E (>) code point (if present) or to the end of the input stream is treated as a comment.
+    // 解析错误，当然未必错误，这里有些情况没有写，比如!DOCTYPE
+    // 错误情况比如 <42></42> 会解析成 #text: <42>  #comment: 42 ，即前者解析成文本，后者如果匹配到了结束标签，则后者解析成注释
+    // 这里先不要急着写报错处理，在构建DOM时再写，在这里写没什么思路
+    // 构建DOM时，将文本和注释插入目标即可
     return this[error](c);
   }
 
@@ -122,7 +130,12 @@ class HTMLLexicalParse {
     }
 
     if (c === "/") {
-      // return this[selfClosingStartTag];
+      // 这种情况下属于自闭和标签，比如<img/>
+      this[emitToken](this._token);
+      var endToken =  new EndTagToken();
+      endToken.name = this._token.name;
+      this._token = endToken;
+      return this[selfClosingStartTag];
     }
 
     if (c === ">") {
@@ -153,6 +166,11 @@ class HTMLLexicalParse {
     }
 
     if (c === "/") {
+      // 这种情况下属于自闭和标签，比如<img />
+      this[emitToken](this._token);
+      var endToken =  new EndTagToken();
+      endToken.name = this._token.name;
+      this._token = endToken;
       return this[selfClosingStartTag];
     }
 
@@ -264,6 +282,11 @@ class HTMLLexicalParse {
     }
 
     if (c === "/") {
+      // 这种情况下属于自闭和标签，比如<img src="a"/>
+      this[emitToken](this._token);
+      var endToken =  new EndTagToken();
+      endToken.name = this._token.name;
+      this._token = endToken;
       return this[selfClosingStartTag];
     }
 
@@ -278,12 +301,17 @@ class HTMLLexicalParse {
       this[emitToken](this._token);
       return this[data];
     }
-
-
   }
 
   [characterReference](c) {
+    if (c === ";") {
+      this._character += c;
+      this[emitToken](this._character);
+      return this[data];
+    }
 
+    this._character += c;
+    return this[characterReference];
   }
 
   [emitToken](token) {
