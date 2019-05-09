@@ -39,7 +39,7 @@ const error = Symbol("error");
 
 
 class HTMLLexicalParse {
-  constructor() {
+  constructor(syntaxer) {
     // 记录目前状态
     this._state = this[data];
     // 记录分析出来的token
@@ -48,6 +48,8 @@ class HTMLLexicalParse {
     this._attribute = null;
     // 记录&的字符串
     this._character = null;
+    // 语法分析方法
+    this._syntaxer = syntaxer;
   }
 
   // 读取传入的字符
@@ -314,12 +316,9 @@ class HTMLLexicalParse {
     return this[characterReference];
   }
 
+  // 这里可重写不同的解析方法，将解析好的token传入语法分析的过程
   [emitToken](token) {
-    if (typeof token === 'string') {
-      console.log(`String(${token.replace(/ /, '<whitespace>').replace(/\n/, '\\n')})`)
-    } else {
-      console.log(token);
-    }
+    this._syntaxer.receiveInput(token); 
   }
 
   [error](c) {
@@ -340,5 +339,7 @@ class EndTagToken {}
 class Attribute {}
 
 module.exports = {
-  HTMLLexicalParse
+  HTMLLexicalParse,
+  StartTagToken,
+  EndTagToken
 }

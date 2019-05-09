@@ -9,9 +9,21 @@ const testHTML = `<html maaa=a >
 </body>
 </html>`
 
-// const testHTML = `<img src="a" test1='b' test2=c>`
+// const testHTML = `<img src="a" />`
 
-let lexer = new HTMLLexicalParse();
+const tempSyntaxer = {
+  receiveInput: (token) => {
+    if (typeof token === 'string') {
+      console.log(`String(${token.replace(/ /, '<whitespace>').replace(/\n/, '\\n')})`)
+    } else {
+      console.log(token);
+    }
+  }
+}
+
+let lexer = new HTMLLexicalParse(tempSyntaxer);
+
+
 
 // 遍历
 for (let c of testHTML) {
