@@ -1,6 +1,17 @@
 const { HTMLLexicalParse } = require("./lexers");
 
-const testHTML = `<html maaa=a >
+// const testHTML = `<html maaa=a >
+// <head>
+//   <title>cool</title>
+// </head>
+// <body>
+//   <img src="a" />
+// </body>
+// </html>`
+
+const testHTML = `
+<!-- Comment Test -->
+<html maaa=a >
 <head>
   <title>cool</title>
 </head>

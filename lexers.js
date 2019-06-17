@@ -30,6 +30,15 @@ const attributeValueUnquoted = Symbol("attributeValueUnquoted");
 const afterAttributeValueQuoted = Symbol("afterAttributeValueQuoted");
 const selfClosingStartTag = Symbol("selfClosingStartTag");
 
+// 注释部分
+const markupDeclarationOpen = Symbol("markupDeclarationOpen");
+const commentStart = Symbol("commentStart");
+const commentStartDash = Symbol("commentStartDash");
+const comment = Symbol("comment");
+const commentEndDash = Symbol("commentEndDash");
+const commentEnd = Symbol("commentEnd");
+
+
 // 输出
 const emitToken = Symbol("emitToken");
 // 打印错误
@@ -48,6 +57,8 @@ class HTMLLexicalParse {
     this._attribute = null;
     // 记录&的字符串
     this._character = null;
+    // 记录注释文本
+    this._comment = null;
     // 语法分析方法
     this._syntaxer = syntaxer;
   }
@@ -84,9 +95,9 @@ class HTMLLexicalParse {
   }
 
   [tagOpen](c) {
-    // DOCTYPE
+    // DOCTYPE 或者 注释
     if (c === "!") {
-      // return this[markupDeclarationOpen];
+      return this[markupDeclarationOpen];
     }
 
     // 结束标签
@@ -109,7 +120,9 @@ class HTMLLexicalParse {
     // 错误情况比如 <42></42> 会解析成 #text: <42>  #comment: 42 ，即前者解析成文本，后者如果匹配到了结束标签，则后者解析成注释
     // 这里先不要急着写报错处理，在构建DOM时再写，在这里写没什么思路
     // 构建DOM时，将文本和注释插入目标即可
-    return this[error](c);
+    // 记录并跳过该字符
+    this[error](c);
+    return this[tagOpen];
   }
 
   [endTagOpen](c) {
@@ -146,7 +159,7 @@ class HTMLLexicalParse {
     }
 
     // 开始标签名称
-    if (/[a-zA-z]/.test(c)) {
+    if (/[a-zA-z0-9]/.test(c)) {
       this._token.name += c;
       return this[tagName];
     }
@@ -316,13 +329,59 @@ class HTMLLexicalParse {
     return this[characterReference];
   }
 
+  // 下面几个是注释部分状态
+  [markupDeclarationOpen](c) {
+    if (c === "-") {
+      return this[commentStart];
+    }
+  }
+
+  [commentStart](c) {
+    if (c === "-") {
+      return this[commentStartDash];
+    }
+  }
+
+  [commentStartDash](c) {
+    if (c === "-") {
+      return this[commentEnd];
+    }
+
+    // 进入注释文本
+    this._comment = new CommentToken();
+    this._comment.value = c;
+    return this[comment];
+  }
+
+  [comment](c) {
+    if (c === "-") {
+      return this[commentEndDash];
+    }
+
+    this._comment.value += c;
+    return this[comment];
+  }
+
+  [commentEndDash](c) {
+    if (c === "-") {
+      return this[commentEnd];
+    }
+  }
+
+  [commentEnd](c) {
+    if (c === ">") {
+      this[emitToken](this._comment);
+      return this[data];
+    }
+  }
+
   // 这里可重写不同的解析方法，将解析好的token传入语法分析的过程
   [emitToken](token) {
     this._syntaxer.receiveInput(token); 
   }
 
   [error](c) {
-    console.log(`warn: ${c}`);
+    console.log(`error: 字符 ${c} 出错`);
     // 这里如何进行错误处理？待考虑
     // 这个token会解析错误，跳过这个token解析后面的token？
   }
@@ -335,11 +394,15 @@ class StartTagToken {}
 // 闭合标签
 class EndTagToken {}
 
+// 注释
+class CommentToken {}
+
 // 属性
 class Attribute {}
 
 module.exports = {
   HTMLLexicalParse,
   StartTagToken,
-  EndTagToken
+  EndTagToken,
+  CommentToken
 }
