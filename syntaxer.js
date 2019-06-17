@@ -1,6 +1,7 @@
 const { StartTagToken, EndTagToken } = require("./lexers");
 
 const getTopStack = Symbol("getTopStack");
+const error = Symbol("error");
 
 // 根节点
 class HTMLDocument {
@@ -44,7 +45,7 @@ class HTMLSyntaticalParser {
     // 遇到文本节点，文本节点都是一个一个字符
     if (typeof token === "string") {
       if (this[getTopStack]() instanceof Text) {
-        // 如果当前节点时文本节点，就合并
+        // 如果当前节点是文本节点，就合并
         // push的是对象，因此只是改动当前栈顶节点即可，其父节点的内容同样会改变
         this[getTopStack]().value += token;
       } else {
@@ -69,9 +70,16 @@ class HTMLSyntaticalParser {
     }
     
     if (token instanceof EndTagToken) {
+      // console.log(this[getTopStack]());
       // console.log(token);
       // 出栈一个节点，检测是否匹配（错误处理还没做）
-      this._stack.pop();
+      if (this[getTopStack]().name === token.name) {
+        // 匹配成功
+        this._stack.pop();
+      } else {
+        // 不匹配
+        this[error](token.name, this[getTopStack]().name);
+      }
     }
   }
 
@@ -83,6 +91,11 @@ class HTMLSyntaticalParser {
   // 获得当前栈 最上面的 节点
   [getTopStack]() {
     return this._stack[this._stack.length - 1];
+  }
+
+  // 报错
+  [error](startTagToken, endTagToken) {
+    console.log(`error: <${startTagToken}> 和 <${endTagToken}> 标签不匹配`);
   }
 }
 
